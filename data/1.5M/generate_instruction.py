@@ -56,8 +56,11 @@ def post_process_gpt3_response(num_prompt_instructions, response):
             raw_instructions = response["text"]  #for text-davinci-003
         except:
             print("ERROR parse!")
-    if '指令:' not in raw_instructions[0: 10] and '指令：' not in raw_instructions[0: 10]:
-        raw_instructions = f"{num_prompt_instructions+1}. 指令:" + raw_instructions
+    if (
+        '指令:' not in raw_instructions[:10]
+        and '指令：' not in raw_instructions[:10]
+    ):
+        raw_instructions = f"{num_prompt_instructions + 1}. 指令:{raw_instructions}"
     raw_instructions = re.split("###", raw_instructions)
     instructions = []
     blacklist = ["图像", "图片", "照片", "文件", "图表", "图层", "曲线图", "折线图", "直线图", "柱形图", "饼状图", "链接", "http",'OpenAI', 'chatgpt', 'gpt-3', 'gpt-3.5', 'gpt-4']
@@ -85,28 +88,28 @@ def post_process_gpt3_response(num_prompt_instructions, response):
             output = output_match.group().strip().strip('\n')
             if '指令:' in output and '输入:' in output and '输出:' in output: # 返回若没有以###号区分，取第一条数据
                 output_pattern_new = re.compile(r"(?<=(?:" + "))[\s\S]*?(?=" + '|'.join(['指令:', '指令：']) + ")")
-                output_match_new = output_pattern_new.search(output)
-                if output_match_new:
+                if output_match_new := output_pattern_new.search(output):
                     output = re.sub(r'\d+\.$', '', output_match_new.group().strip()).strip('\n')
             # 去掉不合理的instruction
             if len(inst) <= 3:
                 continue
-                
+
             for item in replace_empty_list:
                 inst = inst.replace(item, "") 
-            
+
             if "GPT" in inst or 'GPT' in input:
                 continue
-                
+
             if len(input) == 0:  # input无输入
                 instructions.append({"instruction": inst, "input": input, "output": output})
-            else:
-                if '示例' in inst or '例子' in inst:  # inst里给例子
-                    if len(inst) < 150:
-                        instructions.append({"instruction": inst, "input": input, "output": output})
-                else:  # 没给例子
-                    if len(inst) < 100:
-                        instructions.append({"instruction": inst, "input": input, "output": output})
+            elif (
+                ('示例' in inst or '例子' in inst)
+                and len(inst) < 150
+                or '示例' not in inst
+                and '例子' not in inst
+                and len(inst) < 100
+            ):
+                instructions.append({"instruction": inst, "input": input, "output": output})
     return instructions
 
 

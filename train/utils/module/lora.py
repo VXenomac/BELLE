@@ -140,10 +140,11 @@ def _z3_params_to_fetch(param_list):
 
 # convert the LoRA layer to linear layer
 def convert_lora_to_linear_layer(model):
-    repalce_name = []
-    for name, module in model.named_modules():
-        if isinstance(module, LinearLayer_LoRA):
-            repalce_name.append(name)
+    repalce_name = [
+        name
+        for name, module in model.named_modules()
+        if isinstance(module, LinearLayer_LoRA)
+    ]
     for name in repalce_name:
         module = recursive_getattr(model, name)
         zero_stage_3 = hasattr(module.weight, 'ds_id')
@@ -160,8 +161,5 @@ def convert_lora_to_linear_layer(model):
 def only_optimize_lora_parameters(model):
     # turn off the gradient of all the parameters except the LoRA parameters
     for name, param in model.named_parameters():
-        if "lora_right_weight" in name or "lora_left_weight" in name:
-            param.requires_grad = True
-        else:
-            param.requires_grad = False
+        param.requires_grad = "lora_right_weight" in name or "lora_left_weight" in name
     return model

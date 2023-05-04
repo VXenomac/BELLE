@@ -12,9 +12,9 @@ parser.add_argument('--test_file',required=True,type=str)
 parser.add_argument('--predictions_file', default='./predictions.json', type=str)
 args = parser.parse_args()
 
-print("test_file: " + args.test_file)
-print("model_name_or_path: " + args.model_name_or_path)
-print("finetuned_model_name_or_path: " + args.finetuned_model_name_or_path)
+print(f"test_file: {args.test_file}")
+print(f"model_name_or_path: {args.model_name_or_path}")
+print(f"finetuned_model_name_or_path: {args.finetuned_model_name_or_path}")
 
 max_new_tokens = 1024
 generation_config = dict(
@@ -32,8 +32,7 @@ def read_data(filename):
     res = []
     with open(filename, 'r', encoding='utf-8') as f:
         lines = f.readlines()
-        for line in lines:
-            res.append(json.loads(line.strip()))
+        res.extend(json.loads(line.strip()) for line in lines)
     return res
 
 
@@ -45,7 +44,7 @@ def write_data(filename, examples):
         for example in examples:
             f.write(json.dumps(example, ensure_ascii=False) + "\n")
 
-print("predictions will be written at {}".format(args.predictions_file))
+print(f"predictions will be written at {args.predictions_file}")
 
 def get_input_text(input_item):
     conversations = input_item['conversations']
@@ -89,11 +88,7 @@ def _addrole_masklabel_tokenize(source):
 
 if __name__ == '__main__':
     load_type = torch.float16
-    if torch.cuda.is_available():
-        device = torch.device(0)
-    else:
-        device = torch.device('cpu')
-
+    device = torch.device(0) if torch.cuda.is_available() else torch.device('cpu')
     if "llama" in args.model_name_or_path:
         tokenizer = LlamaTokenizer.from_pretrained(args.model_name_or_path)
     else:
@@ -139,5 +134,5 @@ if __name__ == '__main__':
             print("generate_text: ", generate_text)
             print("-"*100)
         index += 1
-        
+
     write_data(args.predictions_file, output_items)

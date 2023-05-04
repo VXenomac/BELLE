@@ -7,8 +7,7 @@ import argparse
 def read_data(path):
     datas = []
     with open(path) as f:
-        for l in f.readlines():
-            datas.append(eval(l))  # json.loads(l) 在加载某些行数据存在问题，这里使用eval
+        datas.extend(eval(l) for l in f)
     return datas
 
 

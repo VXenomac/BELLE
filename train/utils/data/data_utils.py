@@ -80,10 +80,11 @@ class PromptDataset(Dataset):
         self.train_phase = train_phase
 
     def __len__(self):
-        length = len(self.chosen_dataset)
-        if self.train_phase == 3:
-            length = len(self.prompt_dataset)
-        return length
+        return (
+            len(self.prompt_dataset)
+            if self.train_phase == 3
+            else len(self.chosen_dataset)
+        )
 
     def __getitem__(self, idx):
         if self.train_phase == 1:
@@ -158,7 +159,7 @@ def create_dataset_split(current_dataset, raw_dataset, train_phase, tokenizer,
             input_ids, labels, conversation = _addrole_masklabel_tokenize(source)
             input_ids = input_ids[:max_seq_len-1]
             labels = labels[:max_seq_len-1]
-            if not any(x > -100 for x in labels) or "Human" not in conversation:
+            if all(x <= -100 for x in labels) or "Human" not in conversation:
                 #All label value is -100, means that no Human inputs
                 #No human instruction in current conversation
                 filter_nums += 1
@@ -264,10 +265,11 @@ def create_prompt_dataset(local_rank,
 class DataCollatorReward:
 
     def __call__(self, data):
-        batch = {}
-        batch["input_ids"] = torch.cat([f[0]
-                                        for f in data] + [f[2] for f in data],
-                                       dim=0)
+        batch = {
+            "input_ids": torch.cat(
+                [f[0] for f in data] + [f[2] for f in data], dim=0
+            )
+        }
         batch["attention_mask"] = torch.cat([f[1] for f in data] +
                                             [f[3] for f in data],
                                             dim=0)
@@ -374,14 +376,14 @@ class MiniDataset:
     def seperate(self):
         small_dataset = []
         for large_batch in self.dataset:
-            if type(large_batch) == list or type(large_batch) == tuple:
+            if type(large_batch) in [list, tuple]:
                 large_size = len(large_batch[0])
             elif type(large_batch) == dict:
                 large_size = len(large_batch[list(large_batch.keys())[0]])
             else:
                 large_size = len(large_batch)
             for i in range(0, large_size, self.small_batch_size):
-                if type(large_batch) == list or type(large_batch) == tuple:
+                if type(large_batch) in [list, tuple]:
                     small_dataset.append(
                         [x[i:i + self.small_batch_size] for x in large_batch])
                 elif type(large_batch) == dict:
@@ -397,16 +399,12 @@ class MiniDataset:
         return small_dataset
 
     def add(self, data):
-        if len(self.dataset) < self.max_size:
-            self.dataset.append(data)
-            if len(self.dataset) == self.max_size:
-                return self.seperate()
-            else:
-                return None
-        else:
+        if len(self.dataset) >= self.max_size:
             raise ValueError(
                 "The dataset is full but we did not stop it. There is a bug in the code."
             )
+        self.dataset.append(data)
+        return self.seperate() if len(self.dataset) == self.max_size else None
 
     def free(self):
         self.dataset = []
