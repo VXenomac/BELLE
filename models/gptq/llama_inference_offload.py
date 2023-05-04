@@ -90,7 +90,7 @@ class Offload_LlamaModel(LlamaModel):
         if past_key_values is not None:
             past_key_values_length = past_key_values[0][0].shape[2]
             seq_length_with_past = seq_length_with_past + past_key_values_length
-            
+
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
@@ -104,24 +104,23 @@ class Offload_LlamaModel(LlamaModel):
 
         hidden_states = inputs_embeds
 
-        if self.gradient_checkpointing and self.training:
-            if use_cache:
-                logger.warning_once(
-                    "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
-                )
-                use_cache = False
+        if self.gradient_checkpointing and self.training and use_cache:
+            logger.warning_once(
+                "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
+            )
+            use_cache = False
 
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
-        
+
         for idx in range(len(self.layers)):
             if idx <= (self.preload - 1):
                 decoder_layer = self.layers[idx]
             else:
                 decoder_layer = self.layers[idx].to(DEV)
-                
+
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
@@ -152,12 +151,12 @@ class Offload_LlamaModel(LlamaModel):
                 )
 
             hidden_states = layer_outputs[0]
-            
+
             if idx > (self.preload - 1):
                 self.layers[idx] = decoder_layer.cpu()
             del decoder_layer
             torch.cuda.empty_cache()
-                
+
 
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
@@ -172,13 +171,24 @@ class Offload_LlamaModel(LlamaModel):
             all_hidden_states += (hidden_states,)
 
         next_cache = next_decoder_cache if use_cache else None
-        if not return_dict:
-            return tuple(v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns] if v is not None)
-        return BaseModelOutputWithPast(
-            last_hidden_state=hidden_states,
-            past_key_values=next_cache,
-            hidden_states=all_hidden_states,
-            attentions=all_self_attns,
+        return (
+            BaseModelOutputWithPast(
+                last_hidden_state=hidden_states,
+                past_key_values=next_cache,
+                hidden_states=all_hidden_states,
+                attentions=all_self_attns,
+            )
+            if return_dict
+            else tuple(
+                v
+                for v in [
+                    hidden_states,
+                    next_cache,
+                    all_hidden_states,
+                    all_self_attns,
+                ]
+                if v is not None
+            )
         )
 
 def load_quant(model, checkpoint, wbits, groupsize, pre_layer):

@@ -335,7 +335,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--nearest', action='store_true',
         help='Whether to run the RTN baseline.'
-    ) 
+    )
     parser.add_argument(
         '--wbits', type=int, default=16, choices=[2, 3, 4, 8, 16],
         help='#bits to use for quantization; use 16 for evaluating base model.'
@@ -369,7 +369,7 @@ if __name__ == '__main__':
 
     if type(args.load) is not str:
         args.load = args.load.as_posix()
-    
+
     if args.load:
         model = load_quant(args.model, args.load, args.wbits, args.groupsize)
     else:
@@ -392,9 +392,9 @@ if __name__ == '__main__':
             print("not support")
         else:
             model = model.to(DEV)
-        if args.benchmark:
-            input_ids = next(iter(dataloader))[0][:, :args.benchmark]
-            benchmark(model, input_ids, check=args.check)
+    if args.benchmark:
+        input_ids = next(iter(dataloader))[0][:, :args.benchmark]
+        benchmark(model, input_ids, check=args.check)
     if args.load:
         exit()
 

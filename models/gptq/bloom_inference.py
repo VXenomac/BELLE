@@ -82,44 +82,43 @@ if __name__ == '__main__':
         '--text', type=str,
         help='hello'
     )
-    
+
     parser.add_argument(
         '--min_length', type=int, default=10,
         help='The minimum length of the sequence to be generated.'
     )
-    
+
     parser.add_argument(
         '--max_length', type=int, default=1024,
         help='The maximum length of the sequence to be generated.'
     )
-    
+
     parser.add_argument(
         '--top_p', type=float , default=0.95,
         help='If set to float < 1, only the smallest set of most probable tokens with probabilities that add up to top_p or higher are kept for generation.'
     )
-    
+
     parser.add_argument(
         '--temperature', type=float, default=0.8,
         help='The value used to module the next token probabilities.'
     )
-    
+
     args = parser.parse_args()
 
     if type(args.load) is not str:
         args.load = args.load.as_posix()
-    
+
     if args.load:
         model = load_quant(args.model, args.load, args.wbits, args.groupsize)
     else:
         model = get_bloom(args.model)
         model.eval()
-        
+
     model.to(DEV)
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     print("Human:")
-    line = input()
-    while line:
-        inputs = 'Human: ' + line.strip() + '\n\nAssistant:'
+    while line := input():
+        inputs = f'Human: {line.strip()}' + '\n\nAssistant:'
         input_ids = tokenizer.encode(inputs, return_tensors="pt").to(DEV)
 
         with torch.no_grad():
@@ -131,8 +130,7 @@ if __name__ == '__main__':
                 top_p=args.top_p,
                 temperature=args.temperature,
             )
-        print("Assistant:\n") 
+        print("Assistant:\n")
         print(tokenizer.decode([el.item() for el in generated_ids[0]])[len(inputs):]) # generated_ids开头加上了bos_token,需要将inpu的内容截断,只输出Assistant 
         print("\n-------------------------------\n")
         print("Human:") #每次终端用户输入前，加上Human提示。
-        line = input()

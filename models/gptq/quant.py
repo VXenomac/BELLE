@@ -69,11 +69,11 @@ class Quantizer(nn.Module):
         if self.mse:
             best = torch.full([x.shape[0]], float('inf'), device=dev)
             for i in range(int(self.maxshrink * self.grid)):
-                p = 1 - i / self.grid 
+                p = 1 - i / self.grid
                 xmin1 = p * xmin
                 xmax1 = p * xmax
                 scale1 = (xmax1 - xmin1) / self.maxq
-                zero1 = torch.round(-xmin1 / scale1) if not self.sym else self.zero
+                zero1 = self.zero if self.sym else torch.round(-xmin1 / scale1)
                 q = quantize(x, scale1.unsqueeze(1), zero1.unsqueeze(1), self.maxq)
                 q -= x
                 q.abs_()
@@ -102,15 +102,13 @@ class Quantizer(nn.Module):
             self.zero = self.zero.reshape((1, -1, 1, 1))
         if len(shape) == 3:
             self.scale = self.scale.reshape((1, 1, -1))
-            self.zero = self.zero.reshape((1, 1, -1)) 
+            self.zero = self.zero.reshape((1, 1, -1))
         if len(shape) == 2:
             self.scale = self.scale.unsqueeze(0)
             self.zero = self.zero.unsqueeze(0)
 
     def quantize(self, x):
-        if self.ready():
-            return quantize(x, self.scale, self.zero, self.maxq)
-        return x
+        return quantize(x, self.scale, self.zero, self.maxq) if self.ready() else x
 
     def enabled(self):
         return self.maxq > 0
@@ -271,10 +269,16 @@ def make_quant(module, names, bits, groupsize, name=''):
         return
     for attr in dir(module):
         tmp = getattr(module, attr)
-        name1 = name + '.' + attr if name != '' else attr
+        name1 = f'{name}.{attr}' if name != '' else attr
         if name1 in names:
             setattr(
                 module, attr, QuantLinear(bits, groupsize, tmp.in_features, tmp.out_features)
             )
     for name1, child in module.named_children():
-        make_quant(child, names, bits, groupsize, name + '.' + name1 if name != '' else name1)
+        make_quant(
+            child,
+            names,
+            bits,
+            groupsize,
+            f'{name}.{name1}' if name != '' else name1,
+        )
